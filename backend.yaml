@@ -1,0 +1,77 @@
+kind: Template
+apiVersion: v1
+labels:
+  template: backend
+metadata:
+  name: backend
+  annotations:
+    openshift.io/display-name: "VOTEAPP-PHP-MARIADB" 
+    description: "An example of PHP web based application VOTEAPP with a MariaDB database."
+    tags: "back-end"
+objects:
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    generation: 1
+    labels:
+      backend: db
+    name: backend
+  spec:
+    replicas: 1
+    selector:
+      backend: db
+      deploymentconfig: backend
+    strategy:
+      type: Rolling
+    template:
+      metadata:
+        labels:
+          backend: db 
+          deploymentconfig: backend
+      spec:
+        containers:
+        - env:
+          - name: DB_NAME
+            value: vote_db
+          - name: DB_PASSWD
+            value: india@123
+          - name: DB_USER
+            value: root
+          image: 'docker-registry.default.svc:5000/openshift/votedb:latest'
+          imagePullPolicy: Always
+          livenessProbe:
+            initialDelaySeconds: 45
+            tcpSocket:
+              port: 3306
+            timeoutSeconds: 1
+          name: backend
+          ports:
+          - containerPort: 3306
+          readinessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -i
+              - -c
+              - MYSQL_PWD="$DB_PASSWD" mysql -h 127.0.0.1 -u $DB_USER -D $DB_NAME
+                -e 'SELECT 1'
+            timeoutSeconds: 2
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+    triggers:
+    - type: ConfigChange
+- apiVersion: v1
+  kind: Service
+  metadata:
+    labels:
+      backend: db
+    name: backend
+  spec:
+    ports:
+    - name: 3306-tcp
+      port: 3306
+      protocol: TCP
+      targetPort: 3306
+    selector:
+      backend: db 
+      deploymentconfig: backend
